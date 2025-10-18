@@ -1,5 +1,7 @@
 // 实现IEEE 802.15.6 协议的Mac层
 #include "IEEE802_15_6Mac.h"
+#include <cmath>
+#include <algorithm>
 namespace improvedwban {
 Define_Module(IEEE802_15_6Mac);
 
@@ -380,7 +382,9 @@ void IEEE802_15_6Mac::handleMessage(cMessage *msg) {
                     EV << "节点：" << nodeId << "的传输结束，当前时间为：" << simTime() << endl;
                 }
                 
-                // delete msg;
+                // 释放一次性自消息，避免内存泄漏
+                delete msg;
+                msg = nullptr;
                 tryInitiateTransmission();
                 break;}
             case SENSE_DURATION_END:
@@ -427,6 +431,9 @@ void IEEE802_15_6Mac::handleMessage(cMessage *msg) {
                 }
                 break;
             case GUARD_TIME_END:
+                // 释放一次性自消息，避免内存泄漏
+                delete msg;
+                msg = nullptr;
                 EV << "[GUARD_TIME] Node " << nodeId << ": Guard time ended, sending pending polled packet." << endl;
                 if (pendingPolledPacket != nullptr) {
                     // 检查数据包有效性
@@ -512,6 +519,9 @@ void IEEE802_15_6Mac::handleMessage(cMessage *msg) {
                 break;    
             default:
                 HANDLE_ERROR_FORMATTED("Unknown self message kind: %d", msg->getKind());
+                // 防御性释放，避免未知自消息导致泄漏
+                delete msg;
+                msg = nullptr;
         }
     }
     // 处理从上层收到的消息
@@ -1149,7 +1159,7 @@ void IEEE802_15_6Mac::handleDataPacket(improvedwban::WBANDataPacket *pkt) {
            << ", creationTime=" << pkt->getCreationTime() << ", delay=" << delay << endl;
         
         // 添加更多调试信息
-        if (_isnan(delay.dbl())) {
+        if (std::isnan(delay.dbl())) {
             EV_ERROR << "[DATA_PKT] Node " << nodeId << " ERROR: End-to-end delay is NaN! simTime=" << simTime()
                     << ", creationTime=" << pkt->getCreationTime() << endl;
         } else if (delay < 0) {
@@ -1299,7 +1309,7 @@ void IEEE802_15_6Mac::handleAck(improvedwban::WBANAckPacket *pkt) {
            << ", creationTime=" << ackedPkt->getCreationTime() << ", delay=" << delay << endl;
         
         // 添加更多调试信息
-        if (_isnan(delay.dbl())) {
+        if (std::isnan(delay.dbl())) {
             EV_ERROR << "[ACK_PKT] Node " << nodeId << " ERROR: End-to-end delay is NaN! simTime=" << simTime()
                     << ", creationTime=" << ackedPkt->getCreationTime() << endl;
         } else if (delay < 0) {
